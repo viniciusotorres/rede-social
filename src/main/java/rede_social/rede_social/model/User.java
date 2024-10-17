@@ -46,6 +46,9 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "is_verified")
+    private boolean isVerified;
+
     public void updateFromDTO(UserRegisterDTO userRegister, PasswordEncoder passwordEncoder) {
         this.email = userRegister.email();
         this.password = passwordEncoder.encode(userRegister.password());
