@@ -7,9 +7,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import rede_social.rede_social.dto.auth.UserAuthDTO;
 import rede_social.rede_social.dto.auth.UserRegisterDTO;
+import rede_social.rede_social.model.ConfirmationCode;
 import rede_social.rede_social.model.User;
+import rede_social.rede_social.repository.ConfirmationCodeRepository;
 import rede_social.rede_social.repository.UserRepository;
+import rede_social.rede_social.service.email.EmailService;
 
+import java.time.LocalDateTime;
 import java.util.logging.Logger;
 
 @Service
@@ -22,10 +26,15 @@ public class AuthService {
 
     private final TokenService tokenService;
 
-    public AuthService(PasswordEncoder passwordEncoder, TokenService tokenService, UserRepository userRepository) {
+    private final EmailService emailService;
+    private final ConfirmationCodeRepository confirmationCodeRepository;
+
+    public AuthService(PasswordEncoder passwordEncoder, TokenService tokenService, UserRepository userRepository, EmailService emailService, ConfirmationCodeRepository confirmationCodeRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
+        this.emailService = emailService;
+        this.confirmationCodeRepository = confirmationCodeRepository;
     }
 
     @Transactional
@@ -35,6 +44,11 @@ public class AuthService {
                     logger.info("Tentativa de login para o usuário: " + userAuth.email());
                     return new RuntimeException("Usuário não encontrado");
                 });
+
+        if (!user.isVerified()){
+            logger.info("Usuário não verificado: " + user.getName());
+            return ResponseEntity.badRequest().body(new ResponseAuthDTO("", user.getEmail(), "Usuário não verificado"));
+        }
 
         if (user.isPasswordValid(userAuth.password(), passwordEncoder)) {
             var token = tokenService.generateToken(user);
@@ -57,6 +71,15 @@ public class AuthService {
             user.updateFromDTO(userRegister, passwordEncoder);
             userRepository.save(user);
 
+            String code = CodeGenerator.generateCode();
+            LocalDateTime expirationTime = LocalDateTime.now().plusMinutes(10);
+
+            ConfirmationCode confirmationCode = new ConfirmationCode(userRegister.email(), code, expirationTime);
+            confirmationCodeRepository.save(confirmationCode);
+
+            emailService.sendConfirmationEmail(userRegister.email(),
+                    "Código de Confirmação", "Seu código de confirmação é: " + code);
+
             var token = tokenService.generateToken(user);
 
             logger.info("Usuário registrado com sucesso: " + userRegister.email());
@@ -64,6 +87,22 @@ public class AuthService {
         } catch (Exception e) {
             logger.info("Erro ao registrar usuário: " + userRegister.email());
             return ResponseEntity.badRequest().body(new ResponseAuthDTO("", userRegister.email(), "Erro ao registrar usuário"));
+        }
+    }
+
+    @Transactional
+    public ResponseEntity<String> verifyCode(String email, String code) {
+        var confirmationCode = confirmationCodeRepository.findById(email)
+                .orElseThrow(() -> new RuntimeException("Código de confirmação não encontrado"));
+
+        if (confirmationCode.getCode().equals(code) && confirmationCode.getExpirationDate().isAfter(LocalDateTime.now())) {
+            var user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            user.setVerified(true);
+            userRepository.save(user);
+            return ResponseEntity.ok("Código de confirmação válido");
+        } else {
+            return ResponseEntity.badRequest().body("Código de confirmação inválido ou expirado");
         }
     }
 
