@@ -1,4 +1,4 @@
-package rede_social.rede_social.controller;
+package rede_social.rede_social.controller.auth;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -10,8 +10,6 @@ import rede_social.rede_social.dto.auth.UserRegisterDTO;
 import rede_social.rede_social.repository.ConfirmationCodeRepository;
 import rede_social.rede_social.repository.UserRepository;
 import rede_social.rede_social.service.auth.AuthService;
-
-import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping ("/auth")
@@ -44,4 +42,5 @@ public class AuthController {
     public ResponseEntity<String> verifyCode(@RequestParam String email, @RequestParam String code) {
         return authService.verifyCode(email, code);
     }
+
 }

@@ -1,5 +1,6 @@
 package rede_social.rede_social.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,6 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import rede_social.rede_social.dto.auth.UserRegisterDTO;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Getter
@@ -16,6 +18,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "USERS_TB")
+@JsonIgnoreProperties({"following", "followers"})
 public class User {
 
     @Id
@@ -49,6 +52,12 @@ public class User {
     @Column(name = "is_verified")
     private boolean isVerified;
 
+    @OneToMany(mappedBy = "follower")
+    private List<Follow> following;
+
+    @OneToMany(mappedBy = "followed")
+    private List<Follow> followers;
+
     public void updateFromDTO(UserRegisterDTO userRegister, PasswordEncoder passwordEncoder) {
         this.email = userRegister.email();
         this.password = passwordEncoder.encode(userRegister.password());
@@ -64,4 +73,11 @@ public class User {
         return passwordEncoder.matches(rawPassword, this.password);
     }
 
+    public int getFollowersCount() {
+        return followers.size();
+    }
+
+    public int getFollowingCount() {
+        return following.size();
+    }
 }
