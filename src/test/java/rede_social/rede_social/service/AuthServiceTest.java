@@ -8,10 +8,13 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import rede_social.rede_social.dto.auth.UserAuthDTO;
 import rede_social.rede_social.dto.auth.UserRegisterDTO;
+import rede_social.rede_social.model.ConfirmationCode;
 import rede_social.rede_social.model.User;
+import rede_social.rede_social.repository.ConfirmationCodeRepository;
 import rede_social.rede_social.repository.UserRepository;
 import rede_social.rede_social.service.auth.AuthService;
 import rede_social.rede_social.service.auth.TokenService;
+import rede_social.rede_social.service.email.EmailService;
 
 import java.util.Optional;
 
@@ -30,6 +33,12 @@ public class AuthServiceTest {
 
     @Mock
     private TokenService tokenService;
+
+    @Mock
+    private EmailService emailService;
+
+    @Mock
+    private ConfirmationCodeRepository confirmationCodeRepository;
 
     @InjectMocks
     private AuthService authService;
@@ -55,13 +64,14 @@ public class AuthServiceTest {
         when(userRepository.findByEmail(userRegisterDTO.email())).thenReturn(Optional.empty());
         when(passwordEncoder.encode(userRegisterDTO.password())).thenReturn("encodedPassword");
         when(tokenService.generateToken(any(User.class))).thenReturn("token");
+        when(confirmationCodeRepository.save(any(ConfirmationCode.class))).thenReturn(new ConfirmationCode());
+        doNothing().when(emailService).sendConfirmationEmail(anyString(), anyString(), anyString());
 
         var response = authService.register(userRegisterDTO);
 
         assertEquals("Usuário registrado com sucesso", response.getBody().getMessage());
         verify(userRepository, times(1)).save(any(User.class));
     }
-
     @Test
     public void testRegisterException() {
         UserRegisterDTO userRegisterDTO = new UserRegisterDTO("test@example.com", "password", "Test User", "1990-01-01", "http://example.com/photo.jpg", "Bio", "2024-10-16T20:00:00", "2024-10-16T20:00:00");
@@ -79,6 +89,7 @@ public class AuthServiceTest {
         UserAuthDTO userAuthDTO = new UserAuthDTO("test@example.com", "password123");
         User user = new User();
         user.setPassword("encodedPassword");
+        user.setVerified(true); // Ensure the user is verified
 
         when(userRepository.findByEmail(userAuthDTO.email())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(userAuthDTO.password(), "encodedPassword")).thenReturn(true);

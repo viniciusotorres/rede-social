@@ -69,6 +69,7 @@ public class AuthService {
         try {
             var user = new User();
             user.updateFromDTO(userRegister, passwordEncoder);
+            user.setVerified(false);
             userRepository.save(user);
 
             String code = CodeGenerator.generateCode();
@@ -104,6 +105,26 @@ public class AuthService {
         } else {
             return ResponseEntity.badRequest().body("Código de confirmação inválido ou expirado");
         }
+    }
+
+    public ResponseEntity<String> sendCode(String email) {
+        var user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        if (user.isVerified()) {
+            return ResponseEntity.badRequest().body("Usuário já verificado");
+        }
+
+        String code = CodeGenerator.generateCode();
+        LocalDateTime expirationTime = LocalDateTime.now().plusMinutes(10);
+
+        ConfirmationCode confirmationCode = new ConfirmationCode(email, code, expirationTime);
+        confirmationCodeRepository.save(confirmationCode);
+
+        emailService.sendConfirmationEmail(email,
+                "Código de Confirmação", "Seu código de confirmação é: " + code);
+
+        return ResponseEntity.ok("Código de confirmação enviado");
     }
 
 }
