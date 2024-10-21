@@ -7,6 +7,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import rede_social.rede_social.dto.auth.UserAuthDTO;
 import rede_social.rede_social.dto.auth.UserRegisterDTO;
+import rede_social.rede_social.dto.auth.VerifcationDTO;
 import rede_social.rede_social.model.ConfirmationCode;
 import rede_social.rede_social.model.User;
 import rede_social.rede_social.repository.ConfirmationCodeRepository;
@@ -92,12 +93,12 @@ public class AuthService {
     }
 
     @Transactional
-    public ResponseEntity<String> verifyCode(String email, String code) {
-        var confirmationCode = confirmationCodeRepository.findById(email)
+    public ResponseEntity<String> verifyCode(VerifcationDTO verifcationDTO) {
+        var confirmationCode = confirmationCodeRepository.findById(verifcationDTO.email())
                 .orElseThrow(() -> new RuntimeException("Código de confirmação não encontrado"));
 
-        if (confirmationCode.getCode().equals(code) && confirmationCode.getExpirationDate().isAfter(LocalDateTime.now())) {
-            var user = userRepository.findByEmail(email)
+        if (confirmationCode.getCode().equals(verifcationDTO.code()) && confirmationCode.getExpirationDate().isAfter(LocalDateTime.now())) {
+            var user = userRepository.findByEmail(verifcationDTO.email())
                     .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
             user.setVerified(true);
             userRepository.save(user);

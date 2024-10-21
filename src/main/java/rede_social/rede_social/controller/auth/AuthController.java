@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import rede_social.rede_social.dto.auth.ResponseAuthDTO;
 import rede_social.rede_social.dto.auth.UserAuthDTO;
 import rede_social.rede_social.dto.auth.UserRegisterDTO;
+import rede_social.rede_social.dto.auth.VerifcationDTO;
 import rede_social.rede_social.repository.ConfirmationCodeRepository;
 import rede_social.rede_social.repository.UserRepository;
 import rede_social.rede_social.service.auth.AuthService;
@@ -39,8 +40,8 @@ public class AuthController {
     }
 
     @PostMapping("/verify")
-    public ResponseEntity<String> verifyCode(@RequestParam String email, @RequestParam String code) {
-        return authService.verifyCode(email, code);
+    public ResponseEntity<String> verifyCode(@RequestBody VerifcationDTO verifcationDTO) {
+        return authService.verifyCode(verifcationDTO);
     }
 
 }

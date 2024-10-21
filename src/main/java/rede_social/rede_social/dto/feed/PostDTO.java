@@ -6,6 +6,7 @@ import java.util.List;
 public record PostDTO(
         Long id,
         @JsonProperty("user_id") Long userId,
+        @JsonProperty("name") String name,
         String content,
         int dislikes,
         String createdAt,

@@ -16,6 +16,7 @@ import rede_social.rede_social.repository.PostRepository;
 import rede_social.rede_social.repository.UserRepository;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,11 +38,23 @@ public class FeedService {
     public ResponseEntity<FeedDTO> getRecentPosts(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         List<User> followedUsers = user.getFollowing().stream().map(follow -> follow.getFollowed()).toList();
-        List<Post> feedPosts = postRepository.findRecentPostsByFollowedUsers(followedUsers);
+
+        // Fetch posts from followed users
+        List<Post> followedUsersPosts = postRepository.findRecentPostsByFollowedUsers(followedUsers);
+
+        // Fetch user's own posts
+        List<Post> userPosts = postRepository.findRecentPostsByUser(user);
+
+        // Combine both lists
+        List<Post> feedPosts = new ArrayList<>();
+        feedPosts.addAll(followedUsersPosts);
+        feedPosts.addAll(userPosts);
+
         List<PostDTO> postDTOs = feedPosts.stream()
                 .map(post -> new PostDTO(
                         post.getId(),
                         post.getUser().getId(),
+                        post.getUser().getName(),
                         post.getContent(),
                         post.getDislikes(),
                         post.getCreatedAt(),
@@ -61,6 +74,9 @@ public class FeedService {
         Post post = new Post();
         post.setUser(user);
         post.setContent(content);
+        post.setDislikes(0);
+        post.setLikes(List.of());
+        post.setComments(List.of());
         post.setCreatedAt(String.valueOf(LocalDateTime.now()));
         postRepository.save(post);
         return ResponseEntity.ok("Post created successfully");
