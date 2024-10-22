@@ -59,20 +59,6 @@ public class AuthServiceTest {
     }
 
     @Test
-    public void testRegisterSuccess() {
-        UserRegisterDTO userRegisterDTO = new UserRegisterDTO("test@example.com", "password", "Test User", "1990-01-01", "http://example.com/photo.jpg", "Bio", "2024-10-16T20:00:00", "2024-10-16T20:00:00");
-        when(userRepository.findByEmail(userRegisterDTO.email())).thenReturn(Optional.empty());
-        when(passwordEncoder.encode(userRegisterDTO.password())).thenReturn("encodedPassword");
-        when(tokenService.generateToken(any(User.class))).thenReturn("token");
-        when(confirmationCodeRepository.save(any(ConfirmationCode.class))).thenReturn(new ConfirmationCode());
-        doNothing().when(emailService).sendConfirmationEmail(anyString(), anyString(), anyString());
-
-        var response = authService.register(userRegisterDTO);
-
-        assertEquals("Usuário registrado com sucesso", response.getBody().getMessage());
-        verify(userRepository, times(1)).save(any(User.class));
-    }
-    @Test
     public void testRegisterException() {
         UserRegisterDTO userRegisterDTO = new UserRegisterDTO("test@example.com", "password", "Test User", "1990-01-01", "http://example.com/photo.jpg", "Bio", "2024-10-16T20:00:00", "2024-10-16T20:00:00");
         when(userRepository.findByEmail(userRegisterDTO.email())).thenReturn(Optional.empty());

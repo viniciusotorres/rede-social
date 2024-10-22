@@ -3,14 +3,13 @@ package rede_social.rede_social.service.user;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import rede_social.rede_social.dto.user.UserDTO;
 import rede_social.rede_social.model.Follow;
 import rede_social.rede_social.model.User;
 import rede_social.rede_social.repository.FollowRepository;
 import rede_social.rede_social.repository.UserRepository;
+
+import java.util.Base64;
 
 @Service
 public class UserService {
@@ -25,7 +24,16 @@ public class UserService {
         try {
             var user = userRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("User not found"));
-            return ResponseEntity.ok(new UserDTO(user.getId(), user.getEmail(), user.getName(), user.getBirthdate(), user.getBio(), user.getPhoto(), user.getFollowersCount(), user.getFollowingCount()));
+            return ResponseEntity.ok(new UserDTO(
+                    user.getId(),
+                    user.getEmail(),
+                    user.getName(),
+                    user.getBirthdate(),
+                    user.getBio(),
+                    Base64.getEncoder().encodeToString(user.getPhoto()),
+                    user.getFollowersCount(),
+                    user.getFollowingCount()
+            ));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -39,9 +47,18 @@ public class UserService {
             user.setName(userDTO.name());
             user.setBirthdate(userDTO.birthdate());
             user.setBio(userDTO.bio());
-            user.setPhoto(userDTO.photo());
+            user.setPhoto(Base64.getDecoder().decode(userDTO.photo()));
             userRepository.save(user);
-            return ResponseEntity.ok(new UserDTO(user.getId(), user.getEmail(), user.getName(), user.getBirthdate(), user.getBio(), user.getPhoto(), user.getFollowersCount(), user.getFollowingCount()));
+            return ResponseEntity.ok(new UserDTO(
+                    user.getId(),
+                    user.getEmail(),
+                    user.getName(),
+                    user.getBirthdate(),
+                    user.getBio(),
+                    Base64.getEncoder().encodeToString(user.getPhoto()),
+                    user.getFollowersCount(),
+                    user.getFollowingCount()
+            ));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

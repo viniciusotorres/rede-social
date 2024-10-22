@@ -1,5 +1,7 @@
 package rede_social.rede_social.service.auth;
 
+import jakarta.mail.MessagingException;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import rede_social.rede_social.dto.auth.ResponseAuthDTO;
 import org.springframework.http.ResponseEntity;
@@ -46,7 +48,7 @@ public class AuthService {
                     return new RuntimeException("Usuário não encontrado");
                 });
 
-        if (!user.isVerified()){
+        if (!user.isVerified()) {
             logger.info("Usuário não verificado: " + user.getName());
             return ResponseEntity.badRequest().body(new ResponseAuthDTO("", user.getEmail(), "Usuário não verificado"));
         }
@@ -79,8 +81,7 @@ public class AuthService {
             ConfirmationCode confirmationCode = new ConfirmationCode(userRegister.email(), code, expirationTime);
             confirmationCodeRepository.save(confirmationCode);
 
-            emailService.sendConfirmationEmail(userRegister.email(),
-                    "Código de Confirmação", "Seu código de confirmação é: " + code);
+            sendCode(userRegister.email());
 
             var token = tokenService.generateToken(user);
 
@@ -122,8 +123,45 @@ public class AuthService {
         ConfirmationCode confirmationCode = new ConfirmationCode(email, code, expirationTime);
         confirmationCodeRepository.save(confirmationCode);
 
-        emailService.sendConfirmationEmail(email,
-                "Código de Confirmação", "Seu código de confirmação é: " + code);
+        String htmlContent = "<!DOCTYPE html>"
+                + "<html lang='pt-BR'>"
+                + "<head>"
+                + "<meta charset='UTF-8'>"
+                + "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                + "<style>"
+                + "body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }"
+                + ".container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }"
+                + ".header { background-color: #FFD700; color: #ffffff; padding: 10px 0; text-align: center; border-radius: 8px 8px 0 0; }"
+                + ".header h1 { margin: 0; }"
+                + ".content { padding: 20px; }"
+                + ".content p { margin: 0 0 10px; }"
+                + ".footer { text-align: center; padding: 10px 0; color: #777777; font-size: 12px; }"
+                + "</style>"
+                + "</head>"
+                + "<body>"
+                + "<div class='container'>"
+                + "<div class='header'>"
+                + "<h1>Bem-vindo à Rede Social!</h1>"
+                + "</div>"
+                + "<div class='content'>"
+                + "<p>Olá,</p>"
+                + "<p>Seja bem-vindo à nossa rede social. Prepare-se para uma experiência imersiva e envolvente!</p>"
+                + "<p>Seu código de confirmação é: <strong>" + code + "</strong></p>"
+                + "<p>Este código é válido por 10 minutos. Por favor, use-o para completar seu cadastro.</p>"
+                + "</div>"
+                + "<div class='footer'>"
+                + "<p>Se você não solicitou este código, por favor ignore este e-mail.</p>"
+                + "<p>&copy; 2023 Rede Social. Todos os direitos reservados.</p>"
+                + "</div>"
+                + "</div>"
+                + "</body>"
+                + "</html>";
+
+        try {
+            emailService.sendConfirmationEmail(email, "Código de Confirmação", htmlContent);
+        } catch (MessagingException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erro ao enviar e-mail de confirmação");
+        }
 
         return ResponseEntity.ok("Código de confirmação enviado");
     }

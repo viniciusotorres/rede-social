@@ -2,6 +2,7 @@ package rede_social.rede_social.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -40,8 +41,9 @@ public class User {
     @Column(name =  "BIO", nullable = true)
     private String bio;
 
-    @Column(name = "PHOTO", nullable = false)
-    private String photo;
+    @Lob
+    @NotNull(message = "Image cannot be empty")
+    private byte[] photo;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -63,7 +65,7 @@ public class User {
         this.password = passwordEncoder.encode(userRegister.password());
         this.name = userRegister.name();
         this.birthdate = userRegister.birthdate();
-        this.photo = userRegister.photo();
+        this.photo = userRegister.photo().getBytes();
         this.bio = userRegister.bio() != null ? userRegister.bio() : "";
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
