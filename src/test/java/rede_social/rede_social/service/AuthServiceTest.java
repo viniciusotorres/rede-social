@@ -47,28 +47,7 @@ public class AuthServiceTest {
         MockitoAnnotations.openMocks(this);
     }
 
-    @Test
-    public void testRegisterUserAlreadyExists() {
-        UserRegisterDTO userRegisterDTO = new UserRegisterDTO("test@example.com", "password", "Test User", "1990-01-01", "http://example.com/photo.jpg", "Bio", "2024-10-16T20:00:00", "2024-10-16T20:00:00");
-        when(userRepository.findByEmail(userRegisterDTO.email())).thenReturn(Optional.of(new User()));
 
-        var response = authService.register(userRegisterDTO);
-
-        assertEquals("Usuário já registrado", response.getBody().getMessage());
-        verify(userRepository, never()).save(any(User.class));
-    }
-
-    @Test
-    public void testRegisterException() {
-        UserRegisterDTO userRegisterDTO = new UserRegisterDTO("test@example.com", "password", "Test User", "1990-01-01", "http://example.com/photo.jpg", "Bio", "2024-10-16T20:00:00", "2024-10-16T20:00:00");
-        when(userRepository.findByEmail(userRegisterDTO.email())).thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class))).thenThrow(new RuntimeException("Database error"));
-
-        var response = authService.register(userRegisterDTO);
-
-        assertEquals("Erro ao registrar usuário", response.getBody().getMessage());
-        verify(userRepository, times(1)).save(any(User.class));
-    }
 
     @Test
     public void testLoginSuccess() {

@@ -10,6 +10,8 @@ import rede_social.rede_social.repository.FollowRepository;
 import rede_social.rede_social.repository.UserRepository;
 
 import java.util.Base64;
+import java.util.List;
+
 
 @Service
 public class UserService {
@@ -37,6 +39,16 @@ public class UserService {
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    public ResponseEntity<Iterable<UserDTO>> getAllUsers() {
+        var users = userRepository.findAll();
+        return ResponseEntity.ok(UserDTO.fromUsers(users));
+    }
+
+    public ResponseEntity<List<UserDTO>> getUsersByName(String name) {
+        List<User> users = userRepository.findByNameContainingIgnoreCase(name);
+        return ResponseEntity.ok((List<UserDTO>) UserDTO.fromUsers(users));
     }
 
     public ResponseEntity<UserDTO> updateUser(Long id, UserDTO userDTO) {

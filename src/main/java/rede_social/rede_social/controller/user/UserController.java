@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.*;
 import rede_social.rede_social.dto.user.UserDTO;
 import rede_social.rede_social.service.user.UserService;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/user")
 public class UserController {
@@ -16,6 +18,16 @@ public class UserController {
     @GetMapping("profile/{id}")
     public ResponseEntity<UserDTO> getUserById(@PathVariable Long id) {
         return userService.getUserById(id);
+    }
+
+    @GetMapping("profiles")
+    public ResponseEntity<Iterable<UserDTO>> getAllUsers() {
+        return userService.getAllUsers();
+    }
+
+    @GetMapping("profiles/search")
+    public ResponseEntity<List<UserDTO>> getUsersByName(@RequestParam String name) {
+        return userService.getUsersByName(name);
     }
 
     @PutMapping("profile/{id}")

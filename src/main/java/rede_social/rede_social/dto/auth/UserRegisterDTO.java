@@ -3,6 +3,7 @@ package rede_social.rede_social.dto.auth;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.web.multipart.MultipartFile;
 
 public record UserRegisterDTO(
         @Email(message = "Email should be valid")
@@ -16,7 +17,7 @@ public record UserRegisterDTO(
         @NotBlank(message = "Birthdate is mandatory")
         String birthdate,
         @NotBlank(message = "Photo is mandatory")
-        String photo,
+        MultipartFile photo,
         String bio,
         String createdAt,
         String updatedAt) {

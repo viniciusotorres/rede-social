@@ -10,6 +10,7 @@ import lombok.Setter;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import rede_social.rede_social.dto.auth.UserRegisterDTO;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -42,6 +43,7 @@ public class User {
     private String bio;
 
     @Lob
+    @Basic(fetch = FetchType.LAZY)
     @NotNull(message = "Image cannot be empty")
     private byte[] photo;
 
@@ -60,7 +62,7 @@ public class User {
     @OneToMany(mappedBy = "followed")
     private List<Follow> followers;
 
-    public void updateFromDTO(UserRegisterDTO userRegister, PasswordEncoder passwordEncoder) {
+    public void updateFromDTO(UserRegisterDTO userRegister, PasswordEncoder passwordEncoder) throws IOException {
         this.email = userRegister.email();
         this.password = passwordEncoder.encode(userRegister.password());
         this.name = userRegister.name();
@@ -82,4 +84,6 @@ public class User {
     public int getFollowingCount() {
         return following.size();
     }
+
+
 }

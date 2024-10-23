@@ -3,6 +3,8 @@ package rede_social.rede_social.service.auth;
 import jakarta.mail.MessagingException;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 import rede_social.rede_social.dto.auth.ResponseAuthDTO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,7 +18,9 @@ import rede_social.rede_social.repository.ConfirmationCodeRepository;
 import rede_social.rede_social.repository.UserRepository;
 import rede_social.rede_social.service.email.EmailService;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.logging.Logger;
 
 @Service
@@ -50,28 +54,36 @@ public class AuthService {
 
         if (!user.isVerified()) {
             logger.info("Usuário não verificado: " + user.getName());
-            return ResponseEntity.badRequest().body(new ResponseAuthDTO("", user.getEmail(), "Usuário não verificado"));
+            return ResponseEntity.badRequest().body(new ResponseAuthDTO("", user.getEmail(), "Usuário não verificado", null));
         }
 
         if (user.isPasswordValid(userAuth.password(), passwordEncoder)) {
             var token = tokenService.generateToken(user);
             logger.info("Login efetuado com sucesso para o usuário: " + user.getName());
-            return ResponseEntity.ok(new ResponseAuthDTO(token, user.getEmail(), "Usuário logado com sucesso"));
+            return ResponseEntity.ok(new ResponseAuthDTO(token, user.getEmail(), "Usuário logado com sucesso", user.getId()));
         }
 
         logger.info("Credenciais inválidas para o usuário: " + user.getName());
-        return ResponseEntity.badRequest().body(new ResponseAuthDTO("", "", "Credenciais inválidas"));
+        return ResponseEntity.badRequest().body(new ResponseAuthDTO("", "", "Credenciais inválidas", null));
     }
 
     @Transactional
     public ResponseEntity<ResponseAuthDTO> register(UserRegisterDTO userRegister) {
         if (userRepository.findByEmail(userRegister.email()).isPresent()) {
             logger.info("Usuário já registrado: " + userRegister.email());
-            return ResponseEntity.badRequest().body(new ResponseAuthDTO("", userRegister.email(), "Usuário já registrado"));
+            return ResponseEntity.badRequest().body(new ResponseAuthDTO("", userRegister.email(), "Usuário já registrado", null));
         }
         try {
             var user = new User();
             user.updateFromDTO(userRegister, passwordEncoder);
+
+            if (!isValidImageType(userRegister.photo())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image type. Only JPG, JPEG, and PNG are allowed.");
+            }
+
+            String imageBase64 = saveImage(userRegister.photo());
+            user.setPhoto(imageBase64.getBytes());
+
             user.setVerified(false);
             userRepository.save(user);
 
@@ -86,11 +98,21 @@ public class AuthService {
             var token = tokenService.generateToken(user);
 
             logger.info("Usuário registrado com sucesso: " + userRegister.email());
-            return ResponseEntity.ok(new ResponseAuthDTO(token, userRegister.email(), "Usuário registrado com sucesso"));
+            return ResponseEntity.ok(new ResponseAuthDTO(token, userRegister.email(), "Usuário registrado com sucesso", user.getId()));
         } catch (Exception e) {
             logger.info("Erro ao registrar usuário: " + userRegister.email());
-            return ResponseEntity.badRequest().body(new ResponseAuthDTO("", userRegister.email(), "Erro ao registrar usuário"));
+            return ResponseEntity.badRequest().body(new ResponseAuthDTO("", userRegister.email(), "Erro ao registrar usuário", null));
         }
+    }
+
+    private boolean isValidImageType(MultipartFile image) {
+        String contentType = image.getContentType();
+        return contentType.equals("image/jpeg") || contentType.equals("image/jpg") || contentType.equals("image/png");
+    }
+
+    private String saveImage(MultipartFile image) throws IOException {
+        byte[] bytes = image.getBytes();
+        return Base64.getEncoder().encodeToString(bytes);
     }
 
     @Transactional

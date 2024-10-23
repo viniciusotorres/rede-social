@@ -2,6 +2,7 @@ package rede_social.rede_social.service.feed;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import rede_social.rede_social.dto.feed.CommentDTO;
 import rede_social.rede_social.dto.feed.FeedDTO;
 import rede_social.rede_social.dto.feed.LikeDTO;
@@ -17,6 +18,7 @@ import rede_social.rede_social.repository.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,6 +37,7 @@ public class FeedService {
         this.commentRepository = commentRepository;
     }
 
+    @Transactional(readOnly = true)
     public ResponseEntity<FeedDTO> getRecentPosts(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         List<User> followedUsers = user.getFollowing().stream().map(follow -> follow.getFollowed()).toList();
@@ -55,6 +58,7 @@ public class FeedService {
                         post.getId(),
                         post.getUser().getId(),
                         post.getUser().getName(),
+                        Base64.getEncoder().encodeToString(post.getUser().getPhoto()),
                         post.getContent(),
                         post.getDislikes(),
                         post.getCreatedAt(),
@@ -129,4 +133,5 @@ public class FeedService {
         postRepository.delete(post);
         return ResponseEntity.ok("Post deleted successfully");
     }
+
 }
