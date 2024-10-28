@@ -3,6 +3,7 @@ package rede_social.rede_social.service.user;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import rede_social.rede_social.dto.user.TopUserDTO;
 import rede_social.rede_social.dto.user.UserDTO;
 import rede_social.rede_social.model.Follow;
 import rede_social.rede_social.model.User;
@@ -11,6 +12,7 @@ import rede_social.rede_social.repository.UserRepository;
 
 import java.util.Base64;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -110,5 +112,14 @@ public class UserService {
         followRepository.delete(follow);
 
         return ResponseEntity.ok("User unfollowed successfully");
+    }
+
+    public ResponseEntity<List<TopUserDTO>> getTopUsers() {
+        List<User> users = userRepository.findAll();
+        List<User> topUsers = users.stream()
+                .sorted((u1, u2) -> Integer.compare(u2.getFollowersCount(), u1.getFollowersCount()))
+                .limit(5)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok((List<TopUserDTO>) TopUserDTO.fromUsers(topUsers));
     }
 }

@@ -125,7 +125,7 @@ public class AuthService {
     /**
      * Verifica o código de confirmação enviado para o usuário.
      *
-     * @param verifcationDTO DTO contendo o e-mail e o código de verificação.
+     * @param verificationDTO contendo o e-mail e o código de verificação.
      * @return Mensagem de sucesso ou falha da verificação.
      */
     @Transactional

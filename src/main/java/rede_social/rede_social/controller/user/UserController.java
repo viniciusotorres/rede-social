@@ -3,6 +3,7 @@ package rede_social.rede_social.controller.user;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import rede_social.rede_social.dto.user.TopUserDTO;
 import rede_social.rede_social.dto.user.UserDTO;
 import rede_social.rede_social.service.user.UserService;
 
@@ -23,6 +24,11 @@ public class UserController {
     @GetMapping("profiles")
     public ResponseEntity<Iterable<UserDTO>> getAllUsers() {
         return userService.getAllUsers();
+    }
+
+    @GetMapping("top-profiles")
+    public ResponseEntity<List<TopUserDTO>> getTopUsers() {
+        return userService.getTopUsers();
     }
 
     @GetMapping("profiles/search")

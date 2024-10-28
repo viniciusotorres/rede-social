@@ -3,6 +3,7 @@ package rede_social.rede_social.controller.feed;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import rede_social.rede_social.dto.feed.FeedDTO;
+import rede_social.rede_social.dto.feed.FeedTopDTO;
 import rede_social.rede_social.service.feed.FeedService;
 
 
@@ -42,12 +43,17 @@ public class FeedController {
     }
 
     @DeleteMapping("/{userId}/post/{postId}/like")
-    public ResponseEntity<String> unlikePost(@PathVariable Long userId, @PathVariable Long postId) {
+    public ResponseEntity<String> unlikePost(@PathVariable Long userId, @PathVariable Long postId) throws Throwable {
         return feedService.unlikePost(userId, postId);
     }
 
     @DeleteMapping("/{userId}/post/{postId}/comment/{commentId}")
     public ResponseEntity<String> deleteComment(@PathVariable Long userId, @PathVariable Long postId, @PathVariable Long commentId) {
         return feedService.deleteComment(userId, postId, commentId);
+    }
+
+    @GetMapping("/top-posts")
+    public ResponseEntity<FeedTopDTO> getTopPosts() {
+        return feedService.getTopFamousPosts();
     }
 }

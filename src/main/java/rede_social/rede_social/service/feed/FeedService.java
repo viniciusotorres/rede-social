@@ -1,12 +1,12 @@
 package rede_social.rede_social.service.feed;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import rede_social.rede_social.dto.feed.CommentDTO;
-import rede_social.rede_social.dto.feed.FeedDTO;
-import rede_social.rede_social.dto.feed.LikeDTO;
-import rede_social.rede_social.dto.feed.PostDTO;
+import rede_social.rede_social.dto.feed.*;
 import rede_social.rede_social.model.Comment;
 import rede_social.rede_social.model.Like;
 import rede_social.rede_social.model.Post;
@@ -17,121 +17,283 @@ import rede_social.rede_social.repository.PostRepository;
 import rede_social.rede_social.repository.UserRepository;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Serviço responsável pela manipulação de posts, comentários e likes.
+ */
 @Service
 public class FeedService {
+
+    private static final Logger logger = LoggerFactory.getLogger(FeedService.class);
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final LikeRepository likeRepository;
     private final CommentRepository commentRepository;
 
-    public FeedService(PostRepository postRepository, UserRepository userRepository, LikeRepository likeRepository, CommentRepository commentRepository) {
+    public FeedService(PostRepository postRepository, UserRepository userRepository,
+                       LikeRepository likeRepository, CommentRepository commentRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.likeRepository = likeRepository;
         this.commentRepository = commentRepository;
     }
 
+    /**
+     * Obtém os posts mais recentes do usuário e de seus seguidores.
+     *
+     * @param userId ID do usuário
+     * @return FeedDTO com os posts recentes
+     */
     @Transactional(readOnly = true)
     public ResponseEntity<FeedDTO> getRecentPosts(Long userId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
-        List<User> followedUsers = user.getFollowing().stream().map(follow -> follow.getFollowed()).toList();
+        User user = findUserById(userId);
+        List<User> followedUsers = user.getFollowing().stream()
+                .map(follow -> follow.getFollowed())
+                .toList();
 
-        // Fetch posts from followed users
-        List<Post> followedUsersPosts = postRepository.findRecentPostsByFollowedUsers(followedUsers);
+        List<Post> feedPosts = getFeedPosts(followedUsers, user);
 
-        // Fetch user's own posts
-        List<Post> userPosts = postRepository.findRecentPostsByUser(user);
-
-        // Combine both lists
-        List<Post> feedPosts = new ArrayList<>();
-        feedPosts.addAll(followedUsersPosts);
-        feedPosts.addAll(userPosts);
-
-        List<PostDTO> postDTOs = feedPosts.stream()
-                .map(post -> new PostDTO(
-                        post.getId(),
-                        post.getUser().getId(),
-                        post.getUser().getName(),
-                        Base64.getEncoder().encodeToString(post.getUser().getPhoto()),
-                        post.getContent(),
-                        post.getDislikes(),
-                        post.getCreatedAt(),
-                        post.getLikes().stream()
-                                .map(like -> new LikeDTO(like.getId(), like.getUser().getId()))
-                                .collect(Collectors.toList()),
-                        post.getComments().stream()
-                                .map(comment -> new CommentDTO(comment.getId(), comment.getUser().getId(), comment.getContent(), comment.getCreatedAt().toString()))
-                                .collect(Collectors.toList())
-                ))
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(new FeedDTO(postDTOs, "Posts retrieved successfully"));
+        List<PostDTO> postDTOs = convertToPostDTOs(feedPosts);
+        return ResponseEntity.ok(new FeedDTO(postDTOs, "Posts recuperados com sucesso"));
     }
 
+    private User findUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    logger.error("Usuário não encontrado: {}", userId);
+                    return new RuntimeException("Usuário não encontrado");
+                });
+    }
+
+    private List<Post> getFeedPosts(List<User> followedUsers, User user) {
+        List<Post> followedUsersPosts = postRepository.findRecentPostsByFollowedUsers(followedUsers);
+        List<Post> userPosts = postRepository.findRecentPostsByUser(user);
+        followedUsersPosts.addAll(userPosts);
+        return followedUsersPosts;
+    }
+
+    private List<PostDTO> convertToPostDTOs(List<Post> posts) {
+        return posts.stream()
+                .map(this::convertToPostDTO)
+                .collect(Collectors.toList());
+    }
+
+    private PostDTO convertToPostDTO(Post post) {
+        return new PostDTO(
+                post.getId(),
+                post.getUser().getId(),
+                post.getUser().getName(),
+                Base64.getEncoder().encodeToString(post.getUser().getPhoto()),
+                post.getContent(),
+                post.getDislikes(),
+                post.getCreatedAt(),
+                convertLikesToDTOs(post.getLikes()),
+                convertCommentsToDTOs(post.getComments())
+        );
+    }
+
+    private List<LikeDTO> convertLikesToDTOs(List<Like> likes) {
+        return likes.stream()
+                .map(like -> new LikeDTO(like.getId(), like.getUser().getId()))
+                .collect(Collectors.toList());
+    }
+
+    private List<CommentDTO> convertCommentsToDTOs(List<Comment> comments) {
+        return comments.stream()
+                .map(comment -> new CommentDTO(comment.getId(), comment.getUser().getId(),
+                        comment.getContent(), comment.getCreatedAt().toString()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Obtém os posts mais famosos com base em likes e comentários.
+     *
+     * @return FeedTopDTO com os posts mais famosos
+     */
+    public ResponseEntity<FeedTopDTO> getTopFamousPosts() {
+        List<PostScore> topPosts = postRepository.findAll().stream()
+                .map(this::createPostScore)
+                .sorted((ps1, ps2) -> Integer.compare(ps2.getScore(), ps1.getScore()))
+                .limit(5)
+                .collect(Collectors.toList());
+
+        List<TopPostDTO> topPostDTOs = convertToTopPostDTOs(topPosts);
+        return ResponseEntity.ok(new FeedTopDTO(topPostDTOs, "Top posts recuperados com sucesso"));
+    }
+
+    private PostScore createPostScore(Post post) {
+        return new PostScore(post, post.getLikes().size() + post.getComments().size());
+    }
+
+    private List<TopPostDTO> convertToTopPostDTOs(List<PostScore> postScores) {
+        return postScores.stream()
+                .map(postScore -> convertToTopPostDTO(postScore.getPost()))
+                .collect(Collectors.toList());
+    }
+
+    private TopPostDTO convertToTopPostDTO(Post post) {
+        return new TopPostDTO(
+                post.getId(),
+                post.getUser().getId(),
+                post.getUser().getName(),
+                post.getContent(),
+                post.getCreatedAt(),
+                convertLikesToDTOs(post.getLikes()),
+                convertCommentsToDTOs(post.getComments())
+        );
+    }
+
+    /**
+     * Cria um novo post.
+     *
+     * @param userId ID do usuário que cria o post
+     * @param content Conteúdo do post
+     * @return Mensagem de sucesso
+     */
     public ResponseEntity<String> createPost(Long userId, String content) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        User user = findUserById(userId);
         Post post = new Post();
         post.setUser(user);
         post.setContent(content);
         post.setDislikes(0);
         post.setLikes(List.of());
         post.setComments(List.of());
-        post.setCreatedAt(String.valueOf(LocalDateTime.now()));
+        post.setCreatedAt(LocalDateTime.now().toString());
+
         postRepository.save(post);
-        return ResponseEntity.ok("Post created successfully");
+        logger.info("Post criado com sucesso: {}", post.getId());
+        return ResponseEntity.ok("Post criado com sucesso");
     }
 
+    /**
+     * Curte um post.
+     *
+     * @param userId ID do usuário que curte
+     * @param postId ID do post a ser curtido
+     * @return Mensagem de sucesso
+     */
     public ResponseEntity<String> likePost(Long userId, Long postId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
-        Post post = postRepository.findById(postId).orElseThrow(() -> new RuntimeException("Post not found"));
+        User user = findUserById(userId);
+        Post post = findPostById(postId);
+
+        verifyLikeNotExists(userId, postId);
+
         Like like = new Like();
         like.setUser(user);
         like.setPost(post);
         likeRepository.save(like);
-        return ResponseEntity.ok("Post liked successfully");
+
+        logger.info("Post curtido com sucesso: {} por usuário: {}", postId, userId);
+        return ResponseEntity.ok("Post curtido com sucesso");
     }
 
+    private Post findPostById(Long postId) {
+        return postRepository.findById(postId)
+                .orElseThrow(() -> {
+                    logger.error("Post não encontrado: {}", postId);
+                    return new RuntimeException("Post não encontrado");
+                });
+    }
+
+    private void verifyLikeNotExists(Long userId, Long postId) {
+        Optional<Like> existingLike = likeRepository.findByUserIdAndPostId(userId, postId);
+        if (existingLike.isPresent()) {
+            logger.warn("Usuário já curtiu o post: {}", postId);
+            throw new RuntimeException("Usuário já curtiu o post");
+        }
+    }
+
+    /**
+     * Remove o like de um post.
+     *
+     * @param userId ID do usuário que remove o like
+     * @param postId ID do post do qual o like será removido
+     * @return Mensagem de sucesso
+     */
+    public ResponseEntity<String> unlikePost(Long userId, Long postId) throws Throwable {
+        Like like = (Like) likeRepository.findByUserIdAndPostId(userId, postId)
+                .orElseThrow(() -> {
+                    logger.error("Like não encontrado para usuário: {} e post: {}", userId, postId);
+                    return new RuntimeException("Like não encontrado");
+                });
+
+        likeRepository.delete(like);
+        logger.info("Like removido com sucesso: {} por usuário: {}", postId, userId);
+        return ResponseEntity.ok("Like removido com sucesso");
+    }
+
+    /**
+     * Comenta em um post.
+     *
+     * @param userId ID do usuário que comenta
+     * @param postId ID do post que receberá o comentário
+     * @param content Conteúdo do comentário
+     * @return Mensagem de sucesso
+     */
     public ResponseEntity<String> commentOnPost(Long userId, Long postId, String content) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
-        Post post = postRepository.findById(postId).orElseThrow(() -> new RuntimeException("Post not found"));
+        User user = findUserById(userId);
+        Post post = findPostById(postId);
+
         Comment comment = new Comment();
         comment.setUser(user);
         comment.setPost(post);
         comment.setContent(content);
         comment.setCreatedAt(LocalDateTime.now());
+
         commentRepository.save(comment);
-        return ResponseEntity.ok("Comment added successfully");
+        logger.info("Comentário adicionado com sucesso ao post: {} por usuário: {}", postId, userId);
+        return ResponseEntity.ok("Comentário adicionado com sucesso");
     }
 
-    public ResponseEntity<String> unlikePost(Long userId, Long postId) {
-        Like like = likeRepository.findByUserIdAndPostId(userId, postId);
-        likeRepository.delete(like);
-        return ResponseEntity.ok("Like removed successfully");
-    }
-
+    /**
+     * Remove um comentário de um post.
+     *
+     * @param userId ID do usuário que remove o comentário
+     * @param postId ID do post do qual o comentário será removido
+     * @param commentId ID do comentário a ser removido
+     * @return Mensagem de sucesso
+     */
     public ResponseEntity<String> deleteComment(Long userId, Long postId, Long commentId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
-        Comment comment = commentRepository.findById(commentId).orElseThrow(() -> new RuntimeException("Comment not found"));
-        if (comment.getUser().getId() != userId) {
-            throw new RuntimeException("User does not have permission to delete this comment");
+        User user = findUserById(userId);
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> {
+                    logger.error("Comentário não encontrado: {}", commentId);
+                    return new RuntimeException("Comentário não encontrado");
+                });
+
+        if (!comment.getUser().getId().equals(userId)) {
+            logger.warn("Usuário não tem permissão para deletar o comentário: {}", commentId);
+            throw new RuntimeException("Usuário não tem permissão para deletar este comentário");
         }
+
         commentRepository.delete(comment);
-        return ResponseEntity.ok("Comment deleted successfully");
+        logger.info("Comentário removido com sucesso: {}", commentId);
+        return ResponseEntity.ok("Comentário removido com sucesso");
     }
 
+    /**
+     * Remove um post.
+     *
+     * @param userId ID do usuário que remove o post
+     * @param postId ID do post a ser removido
+     * @return Mensagem de sucesso
+     */
     public ResponseEntity<String> deletePost(Long userId, Long postId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
-        Post post = postRepository.findById(postId).orElseThrow(() -> new RuntimeException("Post not found"));
-        if (post.getUser().getId() != userId) {
-            throw new RuntimeException("User does not have permission to delete this post");
-        }
-        postRepository.delete(post);
-        return ResponseEntity.ok("Post deleted successfully");
-    }
+        User user = findUserById(userId);
+        Post post = findPostById(postId);
 
+        if (!post.getUser().getId().equals(userId)) {
+            logger.warn("Usuário não tem permissão para deletar o post: {}", postId);
+            throw new RuntimeException("Usuário não tem permissão para deletar este post");
+        }
+
+        postRepository.delete(post);
+        logger.info("Post removido com sucesso: {}", postId);
+        return ResponseEntity.ok("Post removido com sucesso");
+    }
 }
