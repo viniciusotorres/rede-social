@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import rede_social.rede_social.dto.user.TopUserDTO;
+import rede_social.rede_social.dto.user.UserByIdDTO;
 import rede_social.rede_social.dto.user.UserDTO;
 import rede_social.rede_social.service.user.UserService;
 
@@ -17,9 +18,11 @@ public class UserController {
     private UserService userService;
 
     @GetMapping("profile/{id}")
-    public ResponseEntity<UserDTO> getUserById(@PathVariable Long id) {
-        return userService.getUserById(id);
+    public ResponseEntity<UserByIdDTO> getUserById(@PathVariable Long id) {
+        return userService.getOnlyUser(id);
     }
+
+
 
     @GetMapping("profiles")
     public ResponseEntity<Iterable<UserDTO>> getAllUsers() {

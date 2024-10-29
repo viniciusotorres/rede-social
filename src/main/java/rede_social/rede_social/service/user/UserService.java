@@ -4,10 +4,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import rede_social.rede_social.dto.user.TopUserDTO;
+import rede_social.rede_social.dto.user.UserByIdDTO;
 import rede_social.rede_social.dto.user.UserDTO;
 import rede_social.rede_social.model.Follow;
 import rede_social.rede_social.model.User;
 import rede_social.rede_social.repository.FollowRepository;
+import rede_social.rede_social.repository.PostRepository;
 import rede_social.rede_social.repository.UserRepository;
 
 import java.util.Base64;
@@ -18,6 +20,8 @@ import java.util.stream.Collectors;
 @Service
 public class UserService {
 
+    @Autowired
+    private PostRepository postRepository;
     @Autowired
     private UserRepository userRepository;
 
@@ -37,6 +41,26 @@ public class UserService {
                     Base64.getEncoder().encodeToString(user.getPhoto()),
                     user.getFollowersCount(),
                     user.getFollowingCount()
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    public ResponseEntity<UserByIdDTO> getOnlyUser(Long id){
+        try {
+            var posts = postRepository.findByUser(userRepository.findById(id).get());
+
+            var user = userRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            return ResponseEntity.ok(new UserByIdDTO(
+                    user.getId(),
+                    user.getName(),
+                    user.getFollowersCount(),
+                    user.getFollowingCount(),
+                    user.getEmail(),
+                    posts.size()
+
             ));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
