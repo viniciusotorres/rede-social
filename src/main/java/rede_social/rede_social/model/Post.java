@@ -29,14 +29,14 @@ public class Post {
     @Column(name = "CONTENT", nullable = false)
     private String content;
 
-    @Column(name = "DISLIKES", nullable = false)
-    private int dislikes;
-
     @Column(name = "CREATED_AT", nullable = false)
     private String createdAt;
 
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Like> likes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Dislike> dislikes = new ArrayList<>();
 
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Comment> comments = new ArrayList<>();

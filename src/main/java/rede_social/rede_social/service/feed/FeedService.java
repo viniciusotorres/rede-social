@@ -7,20 +7,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import rede_social.rede_social.dto.feed.*;
-import rede_social.rede_social.model.Comment;
-import rede_social.rede_social.model.Like;
-import rede_social.rede_social.model.Post;
-import rede_social.rede_social.model.User;
-import rede_social.rede_social.repository.CommentRepository;
-import rede_social.rede_social.repository.LikeRepository;
-import rede_social.rede_social.repository.PostRepository;
-import rede_social.rede_social.repository.UserRepository;
+import rede_social.rede_social.model.*;
+import rede_social.rede_social.repository.*;
 
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
 
 /**
  * Serviço responsável pela manipulação de posts, comentários e likes.
@@ -34,13 +29,15 @@ public class FeedService {
     private final UserRepository userRepository;
     private final LikeRepository likeRepository;
     private final CommentRepository commentRepository;
+    private final DislikeRepository dislikeRepository;
 
     public FeedService(PostRepository postRepository, UserRepository userRepository,
-                       LikeRepository likeRepository, CommentRepository commentRepository) {
+                       LikeRepository likeRepository, CommentRepository commentRepository, DislikeRepository dislikeRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.likeRepository = likeRepository;
         this.commentRepository = commentRepository;
+        this.dislikeRepository = dislikeRepository;
     }
 
     /**
@@ -90,7 +87,7 @@ public class FeedService {
                 post.getUser().getName(),
                 Base64.getEncoder().encodeToString(post.getUser().getPhoto()),
                 post.getContent(),
-                post.getDislikes(),
+                convertDislikesToDTOs(post.getDislikes()),
                 post.getCreatedAt(),
                 convertLikesToDTOs(post.getLikes()),
                 convertCommentsToDTOs(post.getComments())
@@ -110,6 +107,11 @@ public class FeedService {
                 .collect(Collectors.toList());
     }
 
+    private List<DislikeDTO> convertDislikesToDTOs(List<Dislike> dislikes) {
+        return dislikes.stream()
+                .map(dislike -> new DislikeDTO(dislike.getId(), dislike.getUser().getId(), dislike.getPost().getId()))
+                .collect(Collectors.toList());
+    }
     /**
      * Obtém os posts mais famosos com base em likes e comentários.
      *
@@ -118,14 +120,21 @@ public class FeedService {
     public ResponseEntity<FeedTopDTO> getTopFamousPosts() {
         List<PostScore> topPosts = postRepository.findAll().stream()
                 .map(this::createPostScore)
-                .sorted((ps1, ps2) -> Integer.compare(ps2.getScore(), ps1.getScore()))
+                .sorted((ps1, ps2) -> {
+                    // Primeiro, comparar pelo número de dislikes (menos dislikes primeiro)
+                    int dislikeComparison = Integer.compare(ps1.getPost().getDislikes().size(), ps2.getPost().getDislikes().size());
+                    if (dislikeComparison != 0) {
+                        return dislikeComparison;
+                    }
+                    // Se o número de dislikes for igual, comparar pelo score (mais curtidas e comentários primeiro)
+                    return Integer.compare(ps2.getScore(), ps1.getScore());
+                })
                 .limit(5)
                 .collect(Collectors.toList());
 
         List<TopPostDTO> topPostDTOs = convertToTopPostDTOs(topPosts);
         return ResponseEntity.ok(new FeedTopDTO(topPostDTOs, "Top posts recuperados com sucesso"));
     }
-
     private PostScore createPostScore(Post post) {
         return new PostScore(post, post.getLikes().size() + post.getComments().size());
     }
@@ -151,7 +160,7 @@ public class FeedService {
     /**
      * Cria um novo post.
      *
-     * @param userId ID do usuário que cria o post
+     * @param userId  ID do usuário que cria o post
      * @param content Conteúdo do post
      * @return Mensagem de sucesso
      */
@@ -160,7 +169,7 @@ public class FeedService {
         Post post = new Post();
         post.setUser(user);
         post.setContent(content);
-        post.setDislikes(0);
+        post.setDislikes(List.of());
         post.setLikes(List.of());
         post.setComments(List.of());
         post.setCreatedAt(LocalDateTime.now().toString());
@@ -180,6 +189,7 @@ public class FeedService {
     public ResponseEntity<String> likePost(Long userId, Long postId) {
         User user = findUserById(userId);
         Post post = findPostById(postId);
+
 
         verifyLikeNotExists(userId, postId);
 
@@ -230,8 +240,8 @@ public class FeedService {
     /**
      * Comenta em um post.
      *
-     * @param userId ID do usuário que comenta
-     * @param postId ID do post que receberá o comentário
+     * @param userId  ID do usuário que comenta
+     * @param postId  ID do post que receberá o comentário
      * @param content Conteúdo do comentário
      * @return Mensagem de sucesso
      */
@@ -253,14 +263,14 @@ public class FeedService {
     /**
      * Remove um comentário de um post.
      *
-     * @param userId ID do usuário que remove o comentário
-     * @param postId ID do post do qual o comentário será removido
+     * @param userId    ID do usuário que remove o comentário
+     * @param postId    ID do post do qual o comentário será removido
      * @param commentId ID do comentário a ser removido
      * @return Mensagem de sucesso
      */
     public ResponseEntity<String> deleteComment(Long userId, Long postId, Long commentId) {
         User user = findUserById(userId);
-        Comment comment = commentRepository.findById(commentId)
+            Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> {
                     logger.error("Comentário não encontrado: {}", commentId);
                     return new RuntimeException("Comentário não encontrado");
@@ -297,5 +307,113 @@ public class FeedService {
         return ResponseEntity.ok("Post removido com sucesso");
     }
 
+    public ResponseEntity<LikesDTO> getLikes(Long userId, Long postId) {
 
+        if (!postRepository.existsById(postId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+
+        if (!userRepository.existsById(userId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+
+        Post post = findPostById(postId);
+
+        List<Like> likes = post.getLikes();
+
+        List<ListLikeDTO> listLikeDTO =
+                likes.stream().map(like ->
+                        new ListLikeDTO(like.getId(),
+                                like.getUser().getId(), like.getUser().getName()
+                                .toString())).collect(Collectors.toList());
+
+        Number countLikes = likes.size();
+
+        return ResponseEntity.ok(new LikesDTO(postId, userId, listLikeDTO, countLikes));
+    }
+
+    public ResponseEntity<CommentsDTO> getComments(Long userId, Long postId){
+        if (!postRepository.existsById(postId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+
+        if (!userRepository.existsById(userId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+
+        Post post = findPostById(postId);
+
+        List<Comment> comments = post.getComments();
+
+        List<ListCommentDTO> listCommentDTO =
+                comments.stream().map(comment ->
+                        new ListCommentDTO(comment.getId(),
+                                comment.getUser().getId(), comment.getUser().getName()
+                                .toString(), comment.getContent(), comment.getCreatedAt().toString())).collect(Collectors.toList());
+
+        Number countComments = comments.size();
+
+        return ResponseEntity.ok(new CommentsDTO(postId, userId, listCommentDTO, countComments));
+    }
+
+    public ResponseEntity<String> deslikePost(Long userId, Long postId) {
+        User user = findUserById(userId);
+        Post post = findPostById(postId);
+        Dislike dislike = dislikeRepository.findByUserIdAndPostId(userId, postId);
+
+        if (dislike != null) {
+            logger.warn("Usuário já descurtiu o post: {}", postId);
+            throw new RuntimeException("Usuário já descurtiu o post");
+        }
+
+        if (post.getLikes().stream().anyMatch(like -> like.getUser().getId().equals(userId))) {
+            logger.warn("Usuário não pode não curtir um post que já curtiu. {}", postId);
+            throw new RuntimeException("Usuário não pode não curtir um post que já curtiu");
+        }
+
+        Dislike newDislike = new Dislike();
+        newDislike.setUser(user);
+        newDislike.setPost(post);
+        dislikeRepository.save(newDislike);
+
+        logger.info("Post descurtido com sucesso: {} por usuário: {}", postId, userId);
+        return ResponseEntity.ok("Post descurtido com sucesso");
+    }
+
+    public ResponseEntity<DislikesDTO> getDislikes(Long userId, Long postId) {
+        if (!postRepository.existsById(postId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+
+        if (!userRepository.existsById(userId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+
+        Post post = findPostById(postId);
+
+        List<Dislike> dislikes = post.getDislikes();
+
+        List<ListDislikeDTO> listDislikeDTO =
+                dislikes.stream().map(dislike ->
+                        new ListDislikeDTO(dislike.getId(),
+                                dislike.getUser().getId(), dislike.getUser().getName()
+                                .toString())).collect(Collectors.toList());
+
+        Number totalDislikes = dislikes.size();
+
+        return ResponseEntity.ok(new DislikesDTO(postId, userId, listDislikeDTO, totalDislikes));
+    }
+
+    public ResponseEntity<String> undeslikePost(Long userId, Long postId) {
+        Dislike dislike = dislikeRepository.findByUserIdAndPostId(userId, postId);
+
+        if (dislike == null) {
+            logger.warn("Descurtida não encontrada para usuário: {} e post: {}", userId, postId);
+            throw new RuntimeException("Descurtida não encontrada");
+        }
+
+        dislikeRepository.delete(dislike);
+        logger.info("Descurtida removida com sucesso: {} por usuário: {}", postId, userId);
+        return ResponseEntity.ok("Descurtida removida com sucesso");
+    }
 }
