@@ -11,7 +11,7 @@ public record PostDTO(
         @JsonProperty("name") String name,
         @JsonProperty("photo")  String photo,
         String content,
-        int dislikes,
+       List<DislikeDTO> dislikes,
         String createdAt,
         List<LikeDTO> likes,
         List<CommentDTO> comments
