@@ -195,4 +195,10 @@ public class FeedController {
     public ResponseEntity<FeedTopDTO> getTopPosts() {
         return feedService.getTopFamousPosts();
     }
+    
+    @GetMapping("/last-post/{userId}")
+    public ResponseEntity<FeedDTO> getLastPost(@PathVariable Long userId) {
+        return feedService.getLastPosts(userId);
+    }
+
 }

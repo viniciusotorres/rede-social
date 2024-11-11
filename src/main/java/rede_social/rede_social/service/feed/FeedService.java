@@ -112,6 +112,7 @@ public class FeedService {
                 .map(dislike -> new DislikeDTO(dislike.getId(), dislike.getUser().getId(), dislike.getPost().getId()))
                 .collect(Collectors.toList());
     }
+
     /**
      * Obtém os posts mais famosos com base em likes e comentários.
      *
@@ -135,6 +136,7 @@ public class FeedService {
         List<TopPostDTO> topPostDTOs = convertToTopPostDTOs(topPosts);
         return ResponseEntity.ok(new FeedTopDTO(topPostDTOs, "Top posts recuperados com sucesso"));
     }
+
     private PostScore createPostScore(Post post) {
         return new PostScore(post, post.getLikes().size() + post.getComments().size());
     }
@@ -270,7 +272,7 @@ public class FeedService {
      */
     public ResponseEntity<String> deleteComment(Long userId, Long postId, Long commentId) {
         User user = findUserById(userId);
-            Comment comment = commentRepository.findById(commentId)
+        Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> {
                     logger.error("Comentário não encontrado: {}", commentId);
                     return new RuntimeException("Comentário não encontrado");
@@ -332,7 +334,7 @@ public class FeedService {
         return ResponseEntity.ok(new LikesDTO(postId, userId, listLikeDTO, countLikes));
     }
 
-    public ResponseEntity<CommentsDTO> getComments(Long userId, Long postId){
+    public ResponseEntity<CommentsDTO> getComments(Long userId, Long postId) {
         if (!postRepository.existsById(postId)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
@@ -415,5 +417,20 @@ public class FeedService {
         dislikeRepository.delete(dislike);
         logger.info("Descurtida removida com sucesso: {} por usuário: {}", postId, userId);
         return ResponseEntity.ok("Descurtida removida com sucesso");
+    }
+
+    public ResponseEntity<FeedDTO> getLastPosts(Long userId) {
+        User user = findUserById(userId);
+
+        List<Post> posts = postRepository.findTop5ByUserOrderByCreatedAtDesc(user);
+
+        List<PostDTO> postDTOs = convertToPostDTOs(posts);
+
+        if (posts.isEmpty()) {
+            logger.warn("Nenhum post encontrado");
+            return ResponseEntity.ok(new FeedDTO(List.of(), "Nenhum post encontrado"));
+        }
+
+        return ResponseEntity.ok(new FeedDTO(postDTOs, "Posts recuperados com sucesso"));
     }
 }
