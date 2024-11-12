@@ -45,7 +45,13 @@ public class ProfileService {
     public ResponseEntity<ResponseViewDTO> viewProfile(Long viewer, Long profileOwner) {
         // Valida se o usuário não está tentando visualizar o próprio perfil
         if (viewer.equals(profileOwner)) {
+            logger.info("Usuário não pode visualizar o próprio perfil");
             throw new IllegalArgumentException("Usuário não pode visualizar o próprio perfil");
+        }
+
+        if (profileViewRepository.existsByViewerIdAndProfileOwnerId(viewer, profileOwner)) {
+            logger.info("Usuário já visualizou o perfil");
+            throw new IllegalArgumentException("Usuário já visualizou o perfil");
         }
 
         // Encontra o visualizador e o dono do perfil no banco de dados

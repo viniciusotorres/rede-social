@@ -22,8 +22,6 @@ public class UserController {
         return userService.getOnlyUser(id);
     }
 
-
-
     @GetMapping("profiles")
     public ResponseEntity<Iterable<UserDTO>> getAllUsers() {
         return userService.getAllUsers();
@@ -32,6 +30,12 @@ public class UserController {
     @GetMapping("top-profiles")
     public ResponseEntity<List<TopUserDTO>> getTopUsers() {
         return userService.getTopUsers();
+    }
+
+    @GetMapping("/{followerId}/is-following/{followedId}")
+    public ResponseEntity<Boolean> isFollowing(@PathVariable Long followerId, @PathVariable Long followedId) {
+        boolean isFollowing = userService.isFollowing(followerId, followedId);
+        return ResponseEntity.ok(isFollowing);
     }
 
     @GetMapping("profiles/search")

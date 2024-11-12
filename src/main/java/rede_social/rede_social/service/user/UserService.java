@@ -1,5 +1,7 @@
 package rede_social.rede_social.service.user;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,7 @@ import rede_social.rede_social.model.User;
 import rede_social.rede_social.repository.FollowRepository;
 import rede_social.rede_social.repository.PostRepository;
 import rede_social.rede_social.repository.UserRepository;
+import rede_social.rede_social.service.profile.ProfileService;
 
 import java.util.Base64;
 import java.util.List;
@@ -19,6 +22,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserService {
+
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
 
     @Autowired
     private PostRepository postRepository;
@@ -103,17 +108,27 @@ public class UserService {
     }
 
     public ResponseEntity<String> followUser(Long followerId, Long followedId) {
+        logger.info("Tentando seguir usuário: followerId={}, followedId={}", followerId, followedId);
+
         if (followerId.equals(followedId)) {
+            logger.warn("O usuário não pode seguir a si mesmo: followerId={}, followedId={}", followerId, followedId);
             return ResponseEntity.badRequest().body("A user cannot follow themselves");
         }
 
         User follower = userRepository.findById(followerId)
-                .orElseThrow(() -> new RuntimeException("Follower not found"));
+                .orElseThrow(() -> {
+                    logger.error("Seguidor não encontrado: followerId={}", followerId);
+                    return new RuntimeException("Follower not found");
+                });
         User followed = userRepository.findById(followedId)
-                .orElseThrow(() -> new RuntimeException("Followed user not found"));
+                .orElseThrow(() -> {
+                    logger.error("Usuário seguido não encontrado: followedId={}", followedId);
+                    return new RuntimeException("Followed user not found");
+                });
 
         boolean alreadyFollowing = followRepository.findByFollowerAndFollowed(follower, followed).isPresent();
         if (alreadyFollowing) {
+            logger.warn("Usuário já está seguindo este usuário: followerId={}, followedId={}", followerId, followedId);
             return ResponseEntity.badRequest().body("User is already following this user");
         }
 
@@ -122,19 +137,32 @@ public class UserService {
         follow.setFollowed(followed);
         followRepository.save(follow);
 
+        logger.info("Usuário seguido com sucesso: followerId={}, followedId={}", followerId, followedId);
         return ResponseEntity.ok("User followed successfully");
     }
 
     public ResponseEntity<String> unfollowUser(Long followerId, Long followedId) {
+        logger.info("Tentando deixar de seguir usuário: followerId={}, followedId={}", followerId, followedId);
+
         User follower = userRepository.findById(followerId)
-                .orElseThrow(() -> new RuntimeException("Follower not found"));
+                .orElseThrow(() -> {
+                    logger.error("Seguidor não encontrado: followerId={}", followerId);
+                    return new RuntimeException("Follower not found");
+                });
         User followed = userRepository.findById(followedId)
-                .orElseThrow(() -> new RuntimeException("Followed user not found"));
+                .orElseThrow(() -> {
+                    logger.error("Usuário seguido não encontrado: followedId={}", followedId);
+                    return new RuntimeException("Followed user not found");
+                });
 
         Follow follow = followRepository.findByFollowerAndFollowed(follower, followed)
-                .orElseThrow(() -> new RuntimeException("Follow relationship not found"));
+                .orElseThrow(() -> {
+                    logger.error("Relação de seguimento não encontrada: followerId={}, followedId={}", followerId, followedId);
+                    return new RuntimeException("Follow relationship not found");
+                });
         followRepository.delete(follow);
 
+        logger.info("Usuário deixou de seguir com sucesso: followerId={}, followedId={}", followerId, followedId);
         return ResponseEntity.ok("User unfollowed successfully");
     }
 
@@ -145,5 +173,9 @@ public class UserService {
                 .limit(5)
                 .collect(Collectors.toList());
         return ResponseEntity.ok((List<TopUserDTO>) TopUserDTO.fromUsers(topUsers));
+    }
+
+    public boolean isFollowing(Long followerId, Long followedId) {
+        return followRepository.existsByFollowerIdAndFollowedId(followerId, followedId);
     }
 }
