@@ -18,6 +18,7 @@ public interface ProfileViewRepository extends JpaRepository<ProfileView, Long> 
     List<ProfileView> findByProfileOwnerAndViewedAt(User profileOwner, LocalDateTime viewedAt);
     List<ProfileView> findByViewerAndProfileOwnerAndViewedAt(User viewer, User profileOwner, LocalDateTime viewedAt);
 
+    boolean existsByViewerIdAndProfileOwnerId(Long viewerId, Long profileOwnerId);
     @Query("SELECT pv FROM ProfileView pv WHERE pv.profileOwner = :profileOwner AND pv.viewedAt >= :startDate")
     List<ProfileView> findByProfileOwnerAndViewedAtAfter(@Param("profileOwner") User profileOwner, @Param("startDate") LocalDateTime startDate);
 }
