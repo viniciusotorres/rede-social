@@ -15,6 +15,8 @@ public class ProfileController {
     @Autowired
     private ProfileService profileService;
 
+
+
     /**
      * Registra uma visualização de perfil de um usuário em outro.
      *
@@ -44,5 +46,11 @@ public class ProfileController {
         // Chama o serviço para buscar as visualizações de perfil do usuário
         return profileService.getViewProfile(profileOwnerId);
     }
+
+    @PostMapping("/favorite/{userId}/{userFavoriteId}")
+    public ResponseEntity<String> favorite(@PathVariable Long userId, @PathVariable Long userFavoriteId) {
+        return profileService.favoriteUser(userId, userFavoriteId);
+    }
+
 
 }

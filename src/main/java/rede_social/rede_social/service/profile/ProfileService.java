@@ -9,8 +9,11 @@ import org.springframework.transaction.annotation.Transactional;
 import rede_social.rede_social.dto.profile.ProfileViewDTO;
 import rede_social.rede_social.dto.profile.ResponseViewDTO;
 import rede_social.rede_social.dto.profile.ViewDTO;
+import rede_social.rede_social.model.Favorite;
 import rede_social.rede_social.model.ProfileView;
 import rede_social.rede_social.model.User;
+import rede_social.rede_social.repository.FavoriteRepository;
+import rede_social.rede_social.repository.FollowRepository;
 import rede_social.rede_social.repository.ProfileViewRepository;
 import rede_social.rede_social.repository.UserRepository;
 
@@ -29,14 +32,20 @@ public class ProfileService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private FavoriteRepository favoriteRepository;
+
+    @Autowired
+    private FollowRepository followRepository;
+
     /**
      * Registra uma visualização de perfil de um usuário em outro.
-     *
+     * <p>
      * Esse método é responsável por registrar quando um usuário (visualizador) visualiza o perfil de
      * outro usuário (dono do perfil). Ele verifica se o visualizador não é o mesmo que o dono do perfil,
      * busca os usuários no banco de dados e cria um registro de visualização.
      *
-     * @param viewer O ID do usuário que está visualizando o perfil.
+     * @param viewer       O ID do usuário que está visualizando o perfil.
      * @param profileOwner O ID do usuário cujo perfil está sendo visualizado.
      * @return Retorna uma resposta com a mensagem de sucesso da operação.
      * @throws IllegalArgumentException Caso o visualizador seja o próprio dono do perfil ou algum dos usuários não seja encontrado.
@@ -80,7 +89,7 @@ public class ProfileService {
     /**
      * Retorna as visualizações de um perfil, incluindo o nome e o ID dos visualizadores
      * nos últimos 30 dias.
-     *
+     * <p>
      * Esse método consulta as visualizações de um perfil específico realizadas nos últimos 30 dias
      * e retorna uma lista de visualizadores (nome e ID) juntamente com a quantidade total de visualizações
      * registradas nesse período.
@@ -116,4 +125,45 @@ public class ProfileService {
         return ResponseEntity.ok(response);
     }
 
+
+    public ResponseEntity<String> favoriteUser(Long userId, Long favoriteId) {
+        logger.info("Tentando favoritar usuário: userId={}, favoriteId={}", userId, favoriteId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    logger.error("Usuário não encontrado: userId={}", userId);
+                    return new RuntimeException("User not found");
+                });
+
+        User favorite = userRepository.findById(favoriteId)
+                .orElseThrow(() -> {
+                    logger.error("Usuário favorito não encontrado: favoriteId={}", favoriteId);
+                    return new RuntimeException("Favorite user not found");
+                });
+
+        boolean alreadyFavorited = favoriteRepository.findByUserAndUserFavorite(user, favorite).isPresent();
+
+        if (alreadyFavorited) {
+            logger.warn("Usuário já favoritou este usuário: userId={}, favoriteId={}", userId, favoriteId);
+            return ResponseEntity.badRequest().body("User already favorited this user");
+        }
+
+        if (userId.equals(favoriteId)) {
+            logger.warn("Usuário não pode se favoritar: userId={}", userId);
+            return ResponseEntity.badRequest().body("User cannot favorite itself");
+        }
+
+        if (followRepository.findByUserAndUserFollowed(user, favorite).isEmpty()) {
+            logger.warn("Usuário não pode favoritar um usuário que não segue: userId={}, favoriteId={}", userId, favoriteId);
+            return ResponseEntity.badRequest().body("User cannot favorite a user that is not followed");
+        }
+
+        Favorite favorite1 = new Favorite();
+        favorite1.setUser(user);
+        favorite1.setUserFavorite(favorite);
+        favoriteRepository.save(favorite1);
+
+        logger.info("Usuário favoritado com sucesso: userId={}, favoriteId={}", userId, favoriteId);
+        return ResponseEntity.ok("User favorited successfully");
+    }
 }
